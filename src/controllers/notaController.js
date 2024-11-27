@@ -54,7 +54,6 @@ import {
         notaProva,
         notaTrabalho,
         notaFinal,
-        criadoEm: new Date(),
       };
   
       const resultado = await criarNota(req, novaNota);
