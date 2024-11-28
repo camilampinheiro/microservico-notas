@@ -1,4 +1,10 @@
-import { obterTodasAsNotas, obterNotaPorId, criarNota, atualizarNota, excluirNota } from "../models/notaModel.js";
+import { 
+    obterTodasAsNotas, 
+    obterNotaPorId, 
+    criarNota, 
+    atualizarNota, 
+    excluirNota 
+} from "../models/notaModel.js";
 
 /**
  * Função auxiliar para manipulação de erros.
