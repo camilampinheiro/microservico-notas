@@ -42,22 +42,72 @@ export const obterNota = tratarErros(async (req, res) => {
 
 /**
  * Controlador para criar uma nova nota.
+ * Calcula automaticamente a notaFinal com base em notaProva e notaTrabalho.
  */
 export const criarNovaNota = tratarErros(async (req, res) => {
-    const novaNota = req.body;
+    const { notaProva, notaTrabalho } = req.body;
+
+    // Verifica se os valores obrigatórios foram enviados
+    if (notaProva === undefined || notaTrabalho === undefined) {
+        return res.status(400).json({ erro: "notaProva e notaTrabalho são obrigatórios." });
+    }
+
+    // Calcula a notaFinal como a média
+    const notaFinal = (notaProva + notaTrabalho) / 2;
+
+    // Monta o objeto a ser salvo
+    const novaNota = {
+        notaProva,
+        notaTrabalho,
+        notaFinal
+    };
+
     const notaCriada = await criarNota(novaNota);
     res.status(201).json(notaCriada);
 });
 
 /**
  * Controlador para atualizar uma nota existente.
+ * Atualiza a notaFinal automaticamente se notaProva ou notaTrabalho forem enviados.
  */
-export const atualizarNotaExistente = tratarErros(async (req, res) => {
+export const atualizarNotaExistente = async (req, res) => {
     const id = req.params.id;
-    const notaAtualizada = req.body;
-    const notaAtualizadaResultado = await atualizarNota(id, notaAtualizada);
-    res.status(200).json(notaAtualizadaResultado);
-});
+    const { notaProva, notaTrabalho } = req.body;
+
+    try {
+        // Busca a nota atual no banco para obter os valores existentes
+        const notaAtual = await obterNotaPorId(id);
+        if (!notaAtual) {
+            return res.status(404).json({ erro: "Nota não encontrada para atualização." });
+        }
+
+        // Determina os valores de notaProva e notaTrabalho
+        const novaNotaProva = notaProva !== undefined ? notaProva : notaAtual.notaProva;
+        const novaNotaTrabalho = notaTrabalho !== undefined ? notaTrabalho : notaAtual.notaTrabalho;
+
+        // Calcula a nova notaFinal com os valores atualizados
+        const notaFinal = (novaNotaProva + novaNotaTrabalho) / 2;
+
+        // Monta o objeto atualizado
+        const notaAtualizada = {
+            ...notaAtual,
+            ...req.body, // Atualiza os valores enviados
+            notaFinal, // Recalcula a notaFinal
+        };
+
+        // Atualiza no banco de dados
+        const notaAtualizadaResultado = await atualizarNota(id, notaAtualizada);
+
+        if (notaAtualizadaResultado.modifiedCount === 0) {
+            return res.status(404).json({ erro: "Nenhuma alteração realizada na nota." });
+        }
+
+        res.status(200).json({ mensagem: "Nota atualizada com sucesso.", notaAtualizada });
+    } catch (erro) {
+        console.error("Erro ao atualizar nota:", erro.message);
+        res.status(500).json({ erro: "Falha ao atualizar nota." });
+    }
+};
 
 /**
  * Controlador para excluir uma nota.
