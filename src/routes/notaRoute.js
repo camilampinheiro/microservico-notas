@@ -6,24 +6,30 @@ import {
   criarNovaNota, 
   atualizarNotaExistente, 
   excluirNotaPorId 
-} 
-from "../controllers/notaController.js";
+} from "../controllers/notaController.js";
 
 // Configurações de CORS
 const opcoesCors = {
     origin: "http://localhost:8000",
-    optionsSuccessStatus: 200
+    optionsSuccessStatus: 200,
 };
 
-const rotas = (app) => {
+// Criar o roteador do Express
+const router = express.Router();
+
+// Configurar rotas
+router.get("/notas", listarNotas);
+router.get("/notas/:id", obterNota);
+router.post("/notas", criarNovaNota);
+router.put("/notas/:id", atualizarNotaExistente);
+router.delete("/notas/:id", excluirNotaPorId);
+
+// Configurar o aplicativo principal
+const configurarRotas = (app) => {
     app.use(cors(opcoesCors));
     app.use(express.json());
-
-    app.get("/notas", listarNotas);
-    app.get("/notas/:id", obterNota);
-    app.post("/notas", criarNovaNota);
-    app.put("/notas/:id", atualizarNotaExistente);
-    app.delete("/notas/:id", excluirNotaPorId);
+    app.use(router); // Adiciona as rotas ao aplicativo principal
 };
 
-export default rotas;
+export default configurarRotas;
+
