@@ -1,103 +1,63 @@
-import {
-    obterTodasAsNotas,
-    obterNotaPorId,
-    criarNota,
-    atualizarNota,
-    excluirNotaPorId,
-  } from "../models/notaModel.js";
-  import fetch from "node-fetch";
-  
-  /**
-   * Lista todas as notas com informações detalhadas de aluno e disciplina.
-   */
-  export async function listarNotas(req, res) {
+import { obterTodasAsNotas, obterNotaPorId, criarNota, atualizarNota, excluirNota } from "../models/notaModel.js";
+
+/**
+ * Função auxiliar para manipulação de erros.
+ * @param {Function} func - Função assíncrona do controlador.
+ * @returns {Function} Função middleware para lidar com erros.
+ */
+const tratarErros = (func) => async (req, res) => {
     try {
-      const notas = await obterTodasAsNotas(req);
-  
-      const notasDetalhadas = await Promise.all(
-        notas.map(async (nota) => {
-          const aluno = await fetch(`${process.env.ALUNO_API}/${nota.aluno_id}`).then((res) =>
-            res.json()
-          );
-          const disciplina = await fetch(`${process.env.DISCIPLINA_API}/${nota.disciplina_id}`).then(
-            (res) => res.json()
-          );
-  
-          return {
-            notaProva: nota.notaProva,
-            notaTrabalho: nota.notaTrabalho,
-            notaFinal: nota.notaFinal,
-            aluno: aluno.nome,
-            disciplina: disciplina.nome,
-          };
-        })
-      );
-  
-      res.status(200).json(notasDetalhadas);
+        await func(req, res);
     } catch (erro) {
-      console.error("Erro ao listar notas:", erro);
-      res.status(500).json({ erro: "Não foi possível buscar as notas" });
+        console.error("Erro:", erro.message);
+        res.status(500).json({ erro: "Ocorreu um erro no servidor" });
     }
-  }
-  
-  /**
-   * Cria uma nova nota.
-   */
-  export async function criarNovaNota(req, res) {
-    try {
-      const { aluno_id, disciplina_id, notaProva, notaTrabalho } = req.body;
-      const notaFinal = (notaProva + notaTrabalho) / 2;
-  
-      const novaNota = {
-        aluno_id,
-        disciplina_id,
-        notaProva,
-        notaTrabalho,
-        notaFinal,
-      };
-  
-      const resultado = await criarNota(req, novaNota);
-      res.status(201).json(resultado);
-    } catch (erro) {
-      console.error("Erro ao criar nota:", erro);
-      res.status(500).json({ erro: "Não foi possível criar a nota" });
+};
+
+/**
+ * Controlador para listar todas as notas.
+ */
+export const listarNotas = tratarErros(async (req, res) => {
+    const notas = await obterTodasAsNotas();
+    res.status(200).json(notas);
+});
+
+/**
+ * Controlador para buscar uma nota pelo ID.
+ */
+export const obterNota = tratarErros(async (req, res) => {
+    const id = req.params.id;
+    const nota = await obterNotaPorId(id);
+    if (!nota) {
+        return res.status(404).json({ erro: "Nota não encontrada" });
     }
-  }
-  
-  /**
-   * Atualiza uma nota existente.
-   */
-  export async function atualizarDetalhesNota(req, res) {
-    try {
-      const { id } = req.params;
-      const { notaProva, notaTrabalho } = req.body;
-      const notaFinal = (notaProva + notaTrabalho) / 2;
-  
-      const notaAtualizada = {
-        notaProva,
-        notaTrabalho,
-        notaFinal,
-      };
-  
-      const resultado = await atualizarNota(req, id, notaAtualizada);
-      res.status(200).json(resultado);
-    } catch (erro) {
-      console.error("Erro ao atualizar nota:", erro);
-      res.status(500).json({ erro: "Não foi possível atualizar a nota" });
-    }
-  }
-  
-  /**
-   * Exclui uma nota pelo ID.
-   */
-  export async function excluirNota(req, res) {
-    try {
-      const { id } = req.params;
-      const resultado = await excluirNotaPorId(req, id);
-      res.status(200).json(resultado);
-    } catch (erro) {
-      console.error("Erro ao excluir nota:", erro);
-      res.status(500).json({ erro: "Não foi possível excluir a nota" });
-    }
-  }
-  
+    res.status(200).json(nota);
+});
+
+/**
+ * Controlador para criar uma nova nota.
+ */
+export const criarNovaNota = tratarErros(async (req, res) => {
+    const novaNota = req.body;
+    const notaCriada = await criarNota(novaNota);
+    res.status(201).json(notaCriada);
+});
+
+/**
+ * Controlador para atualizar uma nota existente.
+ */
+export const atualizarNotaExistente = tratarErros(async (req, res) => {
+    const id = req.params.id;
+    const notaAtualizada = req.body;
+    const notaAtualizadaResultado = await atualizarNota(id, notaAtualizada);
+    res.status(200).json(notaAtualizadaResultado);
+});
+
+/**
+ * Controlador para excluir uma nota.
+ */
+export const excluirNotaPorId = tratarErros(async (req, res) => {
+    const id = req.params.id;
+    const resultado = await excluirNota(id);
+    res.status(200).json(resultado);
+});
