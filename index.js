@@ -14,7 +14,4 @@ app.listen(porta, () => {
     console.log(`Servidor está ouvindo na porta ${porta}...`);
 });
 
-app.get('/', (req, res) => {
-    res.send('API do Microserviço de Notas funcionando!');
-});
 

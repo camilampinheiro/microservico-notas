@@ -39,6 +39,22 @@ async function buscarAluno(alunoId) {
     }
 }
 
+/*
+async function buscarDisciplina(disciplinaId) {
+    try {
+        const response = await fetch(`https://disciplinas-service-umber.vercel.app/disciplinas/${disciplinaId}`);
+        if (!response.ok) {
+            console.error(`Disciplina com ID ${disciplinaId} não encontrado.`);
+            return null;
+        }
+        return await response.json();
+    } catch (erro) {
+        console.error(`Erro ao buscar aluno com ID ${disciplinaId}:`, erro.message);
+        return null;
+    }
+}
+*/
+
 /**
  * Controlador para listar todas as notas.
  */
@@ -47,7 +63,6 @@ export const listarNotas = tratarErros(async (req, res) => {
 
     const notasComAlunos = await Promise.all(
         notas.map(async (nota) => {
-            // Usa o nome do aluno já salvo no banco, se existir
             return {
                 ...nota, 
             };
@@ -62,10 +77,12 @@ export const listarNotas = tratarErros(async (req, res) => {
  * Controlador para criar uma nova nota.
  */
 export const criarNovaNota = tratarErros(async (req, res) => {
-    const { aluno_id, notaProva, notaTrabalho } = req.body;
+    const { aluno_id, //disciplina_id, 
+        notaProva, notaTrabalho } = req.body;
 
     // Verificar se todos os dados obrigatórios foram enviados
-    if (!aluno_id || notaProva === undefined || notaTrabalho === undefined) {
+    if (!aluno_id || // !disciplina_id ||
+        notaProva === undefined || notaTrabalho === undefined) {
         return res.status(400).json({ erro: "aluno_id, disciplina_id, notaProva e notaTrabalho são obrigatórios." });
     }
 
@@ -80,6 +97,11 @@ export const criarNovaNota = tratarErros(async (req, res) => {
         return res.status(404).json({ erro: "Aluno não encontrado no microserviço de Alunos." });
     }
 
+    //const disciplina = await buscarDisciplina(disciplina_id);
+    // if (!disciplina) {
+    //     return res.status(404).json({ erro: "Disciplina não encontrada no microserviço de Disciplinas." });
+    // }
+
     // Calcula a nota final
     const notaFinal = (notaProva + notaTrabalho) / 2;
 
@@ -87,6 +109,7 @@ export const criarNovaNota = tratarErros(async (req, res) => {
     const status = notaFinal >= 6 ? "Aprovado" : "Reprovado";
 
     const nomeAluno = aluno.name;
+    //const nomeDisciplina = disciplina.name;
 
     // Criar o objeto de nota
     const novaNota = {
@@ -124,12 +147,15 @@ export const obterNota = tratarErros(async (req, res) => {
 
     // Busca os dados do aluno relacionado à nota
     const aluno = await buscarAluno(nota.aluno_id);
+    //const disciplina = await buscarDisciplina(nota.disciplina_id);
 
     // Reconstrói o objeto com o campo nomeAluno no lugar certo
     const notaComNome = {
         _id: nota._id,
         aluno_id: nota.aluno_id,
         nomeAluno: aluno ? aluno.name : "Aluno não encontrado",
+        //nomeDisciplina: disciplina ? disciplina.name : "Disciplina não encontrada",
+        //disciplina_id: nota.disciplina_id,
         notaProva: nota.notaProva,
         notaTrabalho: nota.notaTrabalho,
         notaFinal: nota.notaFinal,
