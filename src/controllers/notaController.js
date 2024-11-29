@@ -47,16 +47,16 @@ export const listarNotas = tratarErros(async (req, res) => {
 
     const notasComAlunos = await Promise.all(
         notas.map(async (nota) => {
-            const aluno = await buscarAluno(nota.aluno_id);
+            // Usa o nome do aluno já salvo no banco, se existir
             return {
-                ...nota,
-                aluno: aluno ? aluno.name : "Aluno não encontrado",
+                ...nota, 
             };
         })
     );
 
     res.status(200).json(notasComAlunos);
 });
+
 
 /**
  * Controlador para criar uma nova nota.
@@ -86,10 +86,12 @@ export const criarNovaNota = tratarErros(async (req, res) => {
     // Determinar o status com base na nota final
     const status = notaFinal >= 6 ? "Aprovado" : "Reprovado";
 
+    const nomeAluno = aluno.name;
+
     // Criar o objeto de nota
     const novaNota = {
         aluno_id,
-        aluno,
+        nomeAluno,
         //disciplina_id,
         //disciplina,
         notaProva,
@@ -112,16 +114,29 @@ export const criarNovaNota = tratarErros(async (req, res) => {
  */
 export const obterNota = tratarErros(async (req, res) => {
     const id = req.params.id;
+
+    // Busca a nota no banco
     const nota = await obterNotaPorId(id);
 
     if (!nota) {
         return res.status(404).json({ erro: "Nota não encontrada" });
     }
 
+    // Busca os dados do aluno relacionado à nota
     const aluno = await buscarAluno(nota.aluno_id);
-    nota.aluno = aluno ? aluno.nome : "Aluno não encontrado";
 
-    res.status(200).json(nota);
+    // Reconstrói o objeto com o campo nomeAluno no lugar certo
+    const notaComNome = {
+        _id: nota._id,
+        aluno_id: nota.aluno_id,
+        nomeAluno: aluno ? aluno.name : "Aluno não encontrado",
+        notaProva: nota.notaProva,
+        notaTrabalho: nota.notaTrabalho,
+        notaFinal: nota.notaFinal,
+        status: nota.status,
+    };
+
+    res.status(200).json(notaComNome);
 });
 
 /**
@@ -139,8 +154,7 @@ export const atualizarNotaExistente = tratarErros(async (req, res) => {
     }
 
     // Verificar se as notas enviadas estão no intervalo permitido
-    if ((notaProva !== undefined && (notaProva < 0 || notaProva > 10)) ||
-        (notaTrabalho !== undefined && (notaTrabalho < 0 || notaTrabalho > 10))) {
+    if ((notaProva !== undefined && (notaProva < 0 || notaProva > 10)) || (notaTrabalho !== undefined && (notaTrabalho < 0 || notaTrabalho > 10))) {
         return res.status(400).json({ erro: "As notas devem estar no intervalo de 0 a 10." });
     }
 
@@ -154,10 +168,16 @@ export const atualizarNotaExistente = tratarErros(async (req, res) => {
     // Define o status com base na notaFinal
     const status = notaFinal >= 6 ? "Aprovado" : "Reprovado";
 
+    // Busca os dados do aluno e obtém apenas o nome
+    const aluno = await buscarAluno(notaAtual.aluno_id);
+    const nomeAluno = aluno ? aluno.name : "Aluno não encontrado";
+    
+
     // Monta o objeto atualizado
     const notaAtualizada = {
         ...notaAtual,
         ...req.body,
+        nomeAluno,
         notaFinal,
         status,
     };
@@ -166,9 +186,7 @@ export const atualizarNotaExistente = tratarErros(async (req, res) => {
     const resultado = await atualizarNota(id, notaAtualizada);
 
     if (resultado.modifiedCount === 0) {
-        return res
-            .status(404)
-            .json({ erro: "Nenhuma alteração realizada na nota." });
+        return res.status(404).json({ erro: "Nenhuma alteração realizada na nota." });
     }
 
     res.status(200).json({
@@ -184,5 +202,8 @@ export const atualizarNotaExistente = tratarErros(async (req, res) => {
 export const excluirNotaPorId = tratarErros(async (req, res) => {
     const id = req.params.id;
     const resultado = await excluirNota(id);
-    res.status(200).json(resultado);
+    res.status(200).json({
+        mensagem: "Nota excluída com sucesso.", 
+        resultado: resultado,
+    });
 });
