@@ -1,10 +1,11 @@
-import { 
-    obterTodasAsNotas, 
-    obterNotaPorId, 
-    criarNota, 
-    atualizarNota, 
-    excluirNota 
+import {
+    obterTodasAsNotas,
+    obterNotaPorId,
+    criarNota,
+    atualizarNota,
+    excluirNota,
 } from "../models/notaModel.js";
+import fetch from "node-fetch";
 
 /**
  * Função auxiliar para manipulação de erros.
@@ -21,11 +22,89 @@ const tratarErros = (func) => async (req, res) => {
 };
 
 /**
+ * Função para buscar dados do aluno no microserviço de Alunos.
+ * Retorna os dados do aluno ou null caso não seja encontrado.
+ */
+async function buscarAluno(alunoId) {
+    try {
+        const response = await fetch(`https://student-service-umber.vercel.app/students/${alunoId}`);
+        if (!response.ok) {
+            console.error(`Aluno com ID ${alunoId} não encontrado.`);
+            return null;
+        }
+        return await response.json();
+    } catch (erro) {
+        console.error(`Erro ao buscar aluno com ID ${alunoId}:`, erro.message);
+        return null;
+    }
+}
+
+/**
  * Controlador para listar todas as notas.
  */
 export const listarNotas = tratarErros(async (req, res) => {
     const notas = await obterTodasAsNotas();
-    res.status(200).json(notas);
+
+    const notasComAlunos = await Promise.all(
+        notas.map(async (nota) => {
+            const aluno = await buscarAluno(nota.aluno_id);
+            return {
+                ...nota,
+                aluno: aluno ? aluno.name : "Aluno não encontrado",
+            };
+        })
+    );
+
+    res.status(200).json(notasComAlunos);
+});
+
+/**
+ * Controlador para criar uma nova nota.
+ */
+export const criarNovaNota = tratarErros(async (req, res) => {
+    const { aluno_id, notaProva, notaTrabalho } = req.body;
+
+    // Verificar se todos os dados obrigatórios foram enviados
+    if (!aluno_id || notaProva === undefined || notaTrabalho === undefined) {
+        return res.status(400).json({ erro: "aluno_id, disciplina_id, notaProva e notaTrabalho são obrigatórios." });
+    }
+
+    // Verificar se as notas estão no intervalo permitido
+    if (notaProva < 0 || notaProva > 10 || notaTrabalho < 0 || notaTrabalho > 10) {
+        return res.status(400).json({ erro: "As notas devem estar no intervalo de 0 a 10."});
+    }
+
+    // Verificar se o aluno existe no microserviço de Alunos
+    const aluno = await buscarAluno(aluno_id);
+    if (!aluno) {
+        return res.status(404).json({ erro: "Aluno não encontrado no microserviço de Alunos." });
+    }
+
+    // Calcula a nota final
+    const notaFinal = (notaProva + notaTrabalho) / 2;
+
+    // Determinar o status com base na nota final
+    const status = notaFinal >= 6 ? "Aprovado" : "Reprovado";
+
+    // Criar o objeto de nota
+    const novaNota = {
+        aluno_id,
+        aluno,
+        //disciplina_id,
+        //disciplina,
+        notaProva,
+        notaTrabalho,
+        notaFinal,
+        status,
+    };
+
+    // Inserir no banco de dados
+    const notaCriada = await criarNota(novaNota);
+
+    res.status(201).json({
+        mensagem: "Nota criada com sucesso.",
+        nota: notaCriada,
+    });
 });
 
 /**
@@ -34,80 +113,70 @@ export const listarNotas = tratarErros(async (req, res) => {
 export const obterNota = tratarErros(async (req, res) => {
     const id = req.params.id;
     const nota = await obterNotaPorId(id);
+
     if (!nota) {
         return res.status(404).json({ erro: "Nota não encontrada" });
     }
+
+    const aluno = await buscarAluno(nota.aluno_id);
+    nota.aluno = aluno ? aluno.nome : "Aluno não encontrado";
+
     res.status(200).json(nota);
 });
 
 /**
- * Controlador para criar uma nova nota.
- * Calcula automaticamente a notaFinal com base em notaProva e notaTrabalho.
- */
-export const criarNovaNota = tratarErros(async (req, res) => {
-    const { notaProva, notaTrabalho } = req.body;
-
-    // Verifica se os valores obrigatórios foram enviados
-    if (notaProva === undefined || notaTrabalho === undefined) {
-        return res.status(400).json({ erro: "notaProva e notaTrabalho são obrigatórios." });
-    }
-
-    // Calcula a notaFinal como a média
-    const notaFinal = (notaProva + notaTrabalho) / 2;
-
-    // Monta o objeto a ser salvo
-    const novaNota = {
-        notaProva,
-        notaTrabalho,
-        notaFinal
-    };
-
-    const notaCriada = await criarNota(novaNota);
-    res.status(201).json(notaCriada);
-});
-
-/**
  * Controlador para atualizar uma nota existente.
- * Atualiza a notaFinal automaticamente se notaProva ou notaTrabalho forem enviados.
  */
-export const atualizarNotaExistente = async (req, res) => {
+export const atualizarNotaExistente = tratarErros(async (req, res) => {
     const id = req.params.id;
     const { notaProva, notaTrabalho } = req.body;
 
-    try {
-        // Busca a nota atual no banco para obter os valores existentes
-        const notaAtual = await obterNotaPorId(id);
-        if (!notaAtual) {
-            return res.status(404).json({ erro: "Nota não encontrada para atualização." });
-        }
+    // Busca a nota atual no banco para obter os valores existentes
+    const notaAtual = await obterNotaPorId(id);
 
-        // Determina os valores de notaProva e notaTrabalho
-        const novaNotaProva = notaProva !== undefined ? notaProva : notaAtual.notaProva;
-        const novaNotaTrabalho = notaTrabalho !== undefined ? notaTrabalho : notaAtual.notaTrabalho;
-
-        // Calcula a nova notaFinal com os valores atualizados
-        const notaFinal = (novaNotaProva + novaNotaTrabalho) / 2;
-
-        // Monta o objeto atualizado
-        const notaAtualizada = {
-            ...notaAtual,
-            ...req.body, // Atualiza os valores enviados
-            notaFinal, // Recalcula a notaFinal
-        };
-
-        // Atualiza no banco de dados
-        const notaAtualizadaResultado = await atualizarNota(id, notaAtualizada);
-
-        if (notaAtualizadaResultado.modifiedCount === 0) {
-            return res.status(404).json({ erro: "Nenhuma alteração realizada na nota." });
-        }
-
-        res.status(200).json({ mensagem: "Nota atualizada com sucesso.", notaAtualizada });
-    } catch (erro) {
-        console.error("Erro ao atualizar nota:", erro.message);
-        res.status(500).json({ erro: "Falha ao atualizar nota." });
+    if (!notaAtual) {
+        return res.status(404).json({ erro: "Nota não encontrada para atualização." });
     }
-};
+
+    // Verificar se as notas enviadas estão no intervalo permitido
+    if ((notaProva !== undefined && (notaProva < 0 || notaProva > 10)) ||
+        (notaTrabalho !== undefined && (notaTrabalho < 0 || notaTrabalho > 10))) {
+        return res.status(400).json({ erro: "As notas devem estar no intervalo de 0 a 10." });
+    }
+
+    // Determina os valores de notaProva e notaTrabalho
+    const novaNotaProva = notaProva !== undefined ? notaProva : notaAtual.notaProva;
+    const novaNotaTrabalho = notaTrabalho !== undefined ? notaTrabalho : notaAtual.notaTrabalho;
+
+    // Calcula a nova notaFinal com os valores atualizados
+    const notaFinal = (novaNotaProva + novaNotaTrabalho) / 2;
+
+    // Define o status com base na notaFinal
+    const status = notaFinal >= 6 ? "Aprovado" : "Reprovado";
+
+    // Monta o objeto atualizado
+    const notaAtualizada = {
+        ...notaAtual,
+        ...req.body,
+        notaFinal,
+        status,
+    };
+
+    // Atualiza no banco de dados
+    const resultado = await atualizarNota(id, notaAtualizada);
+
+    if (resultado.modifiedCount === 0) {
+        return res
+            .status(404)
+            .json({ erro: "Nenhuma alteração realizada na nota." });
+    }
+
+    res.status(200).json({
+        mensagem: "Nota atualizada com sucesso.",
+        nota: notaAtualizada,
+    });
+});
+
 
 /**
  * Controlador para excluir uma nota.
