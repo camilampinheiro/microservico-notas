@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node -r dotenv/config index.js",
-    "dev": "node --watch --env-file=.env index.js"
+    "dev": "node --watch --env-file=.env index.js",
+    "vercel-build": "npx mongodb migrate deploy"
   },
   "dependencies": {
     "cors": "^2.8.5",
