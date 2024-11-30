@@ -1,7 +1,4 @@
-import { MongoClient } from 'mongodb';
-import dotenv from 'dotenv';
-
-dotenv.config(); // Carrega o arquivo .env
+import { MongoClient } from 'mongodb'; // Importa o cliente do MongoDB
 
 let mongoClient; // Armazena a conexão compartilhada com o banco de dados
 /**
