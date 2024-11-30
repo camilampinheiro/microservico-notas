@@ -7,7 +7,7 @@ let mongoClient; // Armazena a conexão compartilhada com o banco de dados
  * @returns {Promise<MongoClient>} Uma instância conectada do MongoClient.
  */
 export default async function conectarAoBancoDeDados() {
-    if (!mongoClient) { // Verifica se a conexão já foi criada
+    if (!mongoClient) { 
         try {
             console.log('Conectando ao cluster do banco de dados...');
             mongoClient = new MongoClient(process.env.CONNECTION_STRING);
@@ -15,8 +15,8 @@ export default async function conectarAoBancoDeDados() {
             console.log('Conectado com sucesso ao MongoDB Atlas!');
         } catch (erro) {
             console.error('Falha ao conectar ao banco de dados!', erro);
-            throw erro; // Propaga o erro para quem chamou a função
+            throw erro; 
         }
     }
-    return mongoClient; // Retorna a conexão existente
+    return mongoClient; 
 }

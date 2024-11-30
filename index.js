@@ -13,7 +13,7 @@ app.use(express.json());
 // Conectar ao banco de dados antes de iniciar o servidor
 (async () => {
     try {
-        await conectarAoBancoDeDados(); // Conecta ao MongoDB
+        await conectarAoBancoDeDados(); 
         console.log("Conexão ao banco de dados estabelecida.");
     } catch (erro) {
         console.error("Erro ao conectar ao banco de dados:", erro);
