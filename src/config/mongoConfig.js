@@ -18,7 +18,7 @@ export default async function conectarAoBancoDeDados() {
             console.log('Conectado com sucesso ao MongoDB Atlas!');
         } catch (erro) {
             console.error('Falha ao conectar ao banco de dados!', erro);
-            process.exit(1); // Finaliza o processo em caso de falha
+            throw erro; // Propaga o erro para quem chamou a função
         }
     }
     return mongoClient; // Retorna a conexão existente
